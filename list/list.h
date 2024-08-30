@@ -9,6 +9,33 @@
 #include "../definition.h"
 
 namespace mem_container {
+template <typename T, class L, class Cell>
+struct ListIterator {
+    Cell *cur;
+    ListIterator(Cell *cur) : cur(cur) {}
+    template <typename... Args>
+    ListIterator(L &list, Args &&...args) : cur(list.emplace_back(std::forward<Args>(args)...)) {}
+    inline ListIterator &operator++() { cur = cur->next; return *this; }
+    inline T &operator*() { return cur->data; }
+    inline const T &operator*() const { return cur->data; }
+    inline T *operator->() { return &cur->data; }
+    inline const T *operator->() const { return &cur->data; }
+    inline bool operator==(const ListIterator &other) const { return cur == other.cur; }
+    inline bool operator!=(const ListIterator &other) const { return cur != other.cur; }
+};
+
+template <typename T, class Cell>
+struct ListConstIterator {
+    const Cell *cur;
+    /* intensionally implicit */
+    ListConstIterator(const Cell *cur) : cur(cur) {}
+    inline ListConstIterator &operator++() { cur = cur->next; return *this; }
+    inline const T &operator*() const { return cur->data; }
+    inline const T *operator->() const { return &cur->data; }
+    inline bool operator==(const ListConstIterator &other) const { return cur == other.cur; }
+    inline bool operator!=(const ListConstIterator &other) const { return cur != other.cur; }
+};
+
 template <typename T>
 class List {
 public:
@@ -22,30 +49,8 @@ public:
         ListCell(Args &&...args) : data(std::forward<Args>(args)...), next(NULL) {}
     };
 
-    struct ListIterator {
-        ListCell *cur;
-        ListIterator(ListCell *cur) : cur(cur) {}
-        inline ListIterator &operator++() { cur = cur->next; return *this; }
-        inline T &operator*() { return cur->data; }
-        inline const T &operator*() const { return cur->data; }
-        inline T *operator->() { return &cur->data; }
-        inline const T *operator->() const { return &cur->data; }
-        inline bool operator==(const ListIterator &other) const { return cur == other.cur; }
-        inline bool operator!=(const ListIterator &other) const { return cur != other.cur; }
-    };
-    struct ListConstIterator {
-        const ListCell *cur;
-        /* intensionally implicit */
-        ListConstIterator(const ListCell *cur) : cur(cur) {}
-        inline ListConstIterator &operator++() { cur = cur->next; return *this; }
-        inline const T &operator*() const { return cur->data; }
-        inline const T *operator->() const { return &cur->data; }
-        inline bool operator==(const ListConstIterator &other) const { return cur == other.cur; }
-        inline bool operator!=(const ListConstIterator &other) const { return cur != other.cur; }
-    };
-
-    using iterator = ListIterator;
-    using const_iterator = ListConstIterator;
+    using iterator = ListIterator<T, List, ListCell>;
+    using const_iterator = ListConstIterator<T, ListCell>;
 
     List() { CreateMemCxt(); }
     List(const List &other) : List()
@@ -64,7 +69,7 @@ public:
     List &operator=(const List &other)
     {
         if (this != &other) {
-            clear();
+            destroy();
             CreateMemCxt();
             ListCell *cur = other._head;
             while (cur) {
@@ -77,11 +82,8 @@ public:
     List &operator=(List &&other)
     {
         if (this != &other) {
-            clear();
-            _head = other._head;
-            _tail = other._tail;
-            other._head = other._tail = NULL;
-            ExchangeMemCxt(other);
+            destroy();
+            swap(other);
         }
         return *this;
     }
@@ -117,7 +119,7 @@ public:
     template <typename... Args>
     ListCell *emplace_back(Args &&...args)
     {
-        ListCell *cell = NEW ListCell(T(std::forward<Args>(args)...));
+        ListCell *cell = alloc_new_cell(std::forward<Args>(args)...);
         if (!_head) {
             _head = _tail = cell;
         } else {
@@ -144,6 +146,7 @@ public:
             return;
         }
         if (_head == _tail) {
+            optional_destroy(_head);
             delete _head;
             _head = _tail = NULL;
             return;
@@ -152,6 +155,7 @@ public:
         while (cur->next != _tail) {
             cur = cur->next;
         }
+        optional_destroy(_tail);
         delete _tail;
         _tail = cur;
         _tail->next = NULL;
@@ -162,12 +166,14 @@ public:
             return;
         }
         if (_head == _tail) {
+            optional_destroy(_head);
             delete _head;
             _head = _tail = NULL;
             return;
         }
         ListCell *tmp = _head;
         _head = _head->next;
+        optional_destroy(tmp);
         delete tmp;
     }
 
@@ -199,13 +205,14 @@ public:
         while (cur) {
             ListCell *tmp = cur;
             cur = cur->next;
+            optional_destroy(tmp);
             delete tmp;
         }
         _head = _tail = NULL;
         DestroyMemCxt();
     }
     inline void clear() { destroy(); }
-protected:
+private:
     MemCxtHolder;
     ListCell *_head{NULL};
     ListCell *_tail{NULL};
@@ -245,6 +252,7 @@ protected:
     {
         if (cell == _head) {
             _head = _head->next;
+            optional_destroy(cell);
             delete cell;
             return;
         }
@@ -253,6 +261,7 @@ protected:
             cur = cur->next;
         }
         cur->next = cell->next;
+        optional_destroy(cell);
         delete cell;
     }
 };
@@ -270,32 +279,9 @@ public:
         template <typename... Args>
         DLListCell(Args &&...args) : data(std::forward<Args>(args)...), prev(NULL), next(NULL) {}
     };
-    struct DLIterator {
-        DLListCell *cur;
-        DLIterator(DLListCell *cur) : cur(cur) {}
-        inline DLIterator &operator++() { cur = cur->next; return *this; }
-        inline DLIterator &operator--() { cur = cur->prev; return *this; }
-        inline T &operator*() { return cur->data; }
-        inline const T &operator*() const { return cur->data; }
-        inline T *operator->() { return &cur->data; }
-        inline const T *operator->() const { return &cur->data; }
-        inline bool operator==(const DLIterator &other) const { return cur == other.cur; }
-        inline bool operator!=(const DLIterator &other) const { return cur != other.cur; }
-    };
-    struct DLConstIterator {
-        const DLListCell *cur;
-        /* intensionally implicit */
-        DLConstIterator(const DLListCell *cur) : cur(cur) {}
-        inline DLConstIterator &operator++() { cur = cur->next; return *this; }
-        inline DLConstIterator &operator--() { cur = cur->prev; return *this; }
-        inline const T &operator*() const { return cur->data; }
-        inline const T *operator->() const { return &cur->data; }
-        inline bool operator==(const DLConstIterator &other) const { return cur == other.cur; }
-        inline bool operator!=(const DLConstIterator &other) const { return cur != other.cur; }
-    };
 
-    using iterator = DLIterator;
-    using const_iterator = const DLConstIterator;
+    using iterator = ListIterator<T, DLList, DLListCell>;
+    using const_iterator = ListConstIterator<T, DLListCell>;
 
     DLList() { CreateMemCxt(); }
     DLList(const DLList &other) : DLList()
@@ -314,7 +300,7 @@ public:
     DLList &operator=(const DLList &other)
     {
         if (this != &other) {
-            clear();
+            destroy();
             CreateMemCxt();
             DLListCell *cur = other._head;
             while (cur) {
@@ -327,11 +313,8 @@ public:
     DLList &operator=(DLList &&other)
     {
         if (this != &other) {
-            clear();
-            _head = other._head;
-            _tail = other._tail;
-            other._head = other._tail = NULL;
-            ExchangeMemCxt(other);
+            destroy();
+            swap(other);
         }
         return *this;
     }
@@ -398,12 +381,14 @@ public:
             return;
         }
         if (_head == _tail) {
+            optional_destroy(_head);
             delete _head;
             _head = _tail = NULL;
             return;
         }
         DLListCell *tmp = _tail;
         _tail = _tail->prev;
+        optional_destroy(tmp);
         delete tmp;
         _tail->next = NULL;
     }
@@ -413,12 +398,14 @@ public:
             return;
         }
         if (_head == _tail) {
+            optional_destroy(_head);
             delete _head;
             _head = _tail = NULL;
             return;
         }
         DLListCell *tmp = _head;
         _head = _head->next;
+        optional_destroy(tmp);
         delete tmp;
         _head->prev = NULL;
     }
@@ -453,13 +440,14 @@ public:
         while (cur) {
             DLListCell *tmp = cur;
             cur = cur->next;
+            optional_destroy(tmp);
             delete tmp;
         }
         _head = _tail = NULL;
         DestroyMemCxt();
     }
     inline void clear() { destroy(); }
-protected:
+private:
     MemCxtHolder;
     DLListCell *_head{NULL};
     DLListCell *_tail{NULL};
@@ -499,16 +487,19 @@ protected:
     {
         if (cell == _head) {
             _head = _head->next;
+            optional_destroy(cell);
             delete cell;
             return;
         }
         if (cell == _tail) {
             _tail = _tail->prev;
+            optional_destroy(cell);
             delete cell;
             return;
         }
         cell->prev->next = cell->next;
         cell->next->prev = cell->prev;
+        optional_destroy(cell);
         delete cell;
     }
     void move_back(DLListCell *cell)

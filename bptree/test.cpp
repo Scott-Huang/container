@@ -2,7 +2,9 @@
 
 #include <map>
 #include <random>
-#include "btree.h"
+#include "bptree.h"
+
+using namespace mem_container;
 
 template <typename K, typename V>
 static void check_invariant(const BPTree<K, V> &tree) {

@@ -61,13 +61,7 @@ public:
     {
         if (this != &other) {
             destroy();
-            _start = other._start;
-            _end = other._end;
-            _capacity = other._capacity;
-            other._start = NULL;
-            other._end = NULL;
-            other._capacity = 0;
-            ExchangeMemCxt(other);
+            swap(other);
         }
         return *this;
     }
@@ -107,8 +101,18 @@ public:
         _end = _start + expect_size;
     }
 
-    inline void push_back(const T &val) { expand_to(size() + 1); *_end++ = val; }
-    inline void push_back(T &&val) { expand_to(size() + 1); *_end++ = std::move(val); }
+    inline void push_back(const T &val)
+    {
+        expand_to(size() + 1);
+        if (std::is_trivially_constructible_v<T, T>) {
+            new (_end++) T(val);
+        } else {
+            UseMemCxt();
+            new (_end++) T(val);
+            ResetMemCxt();
+        }
+    }
+    inline void push_back(T &&val) { expand_to(size() + 1); new (_end++) T(std::move(val)); }
     template <typename... Args>
     inline void emplace_back(Args &&... args)
     {
@@ -154,6 +158,7 @@ public:
     }
     inline void clear() { destroy(); }
 private:
+    MemCxtHolder;
     T *_start;
     T *_end;
     size_t _capacity;

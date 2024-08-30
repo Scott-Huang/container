@@ -3,6 +3,8 @@
 #include <random>
 #include "interval_set.h"
 
+using namespace mem_container;
+
 using IntervalSetType = IntervalSet<size_t>;
 #define IntervalSetContain(set, ival) (set.contains(ival))
 

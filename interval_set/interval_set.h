@@ -9,7 +9,7 @@
 #include <utility>
 #include "interval.h"
 #include "../definition.h"
-#include "../bptree/btree.h"
+#include "../bptree/bptree.h"
 #include "../vector/vector.h"
 
 namespace mem_container {
@@ -50,11 +50,6 @@ public:
 private:
     BPTree<Bound, Bound> _ivals{};
 };
-} /* namespace mem_container */
-
-/* place for implementation */
-
-using namespace mem_container;
 
 template <typename T, template<typename> class IntervalType>
 void IntervalSet<T, IntervalType>::insert(const interval_type &ival)
@@ -107,5 +102,6 @@ bool IntervalSet<T, IntervalType>::contains(const interval_type &ival) const
     interval_type cur_ival = interval_type(it.key(), it.value());
     return cur_ival.contains(ival);
 }
+} /* namespace mem_container */
 
 #endif /* CONTAINER_INTERVAL_SET_H */

@@ -34,5 +34,16 @@
 !*test/
 
 # data files
+*.txt
+*.csv
+*.tsv
+*.json
+*.xml
+*.yaml
+*.yml
+*.tar
+*.zip
+*.gz
+*.bz2
 *.data
 *.data.old
