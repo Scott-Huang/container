@@ -79,8 +79,8 @@ public:
         ExchangeMemCxt(other);
     }
 
-    using iterator_type = T *;
-    using const_iterator_type = const T *;
+    using iterator = T *;
+    using const_iterator = const T *;
 
     inline void reserve(size_t expect_size) { expand_to(expect_size); }
     void resize(size_t expect_size)
@@ -131,16 +131,18 @@ public:
     inline size_t capacity() const { return _capacity; }
     inline bool empty() const { return _start == _end; }
 
+    inline void set(size_t idx, const T &val) { CONTAINER_ASSERT(idx < size()); _start[idx] = val; }
+    inline void set(size_t idx, T &&val) { CONTAINER_ASSERT(idx < size()); _start[idx] = std::move(val); }
     inline T &operator[](size_t idx) { CONTAINER_ASSERT(idx < size()); return _start[idx]; }
     inline const T &operator[](size_t idx) const { CONTAINER_ASSERT(idx < size()); return _start[idx]; }
     inline T &front() { CONTAINER_ASSERT(size() > 0); return *_start; }
     inline const T &front() const { CONTAINER_ASSERT(size() > 0); return *_start; }
 
-    inline iterator_type at(size_t idx) { return std::min(_start + idx, _end); }
-    inline iterator_type begin() { return _start; }
-    inline iterator_type end() { return _end; }
-    inline const_iterator_type cbegin() const { return _start; }
-    inline const_iterator_type cend() const { return _end; }
+    inline iterator at(size_t idx) { return std::min(_start + idx, _end); }
+    inline iterator begin() { return _start; }
+    inline iterator end() { return _end; }
+    inline const_iterator cbegin() const { return _start; }
+    inline const_iterator cend() const { return _end; }
 
     /* erase not implemented since no urgent use case */
 

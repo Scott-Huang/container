@@ -50,6 +50,11 @@ ConcurrentList keeps iterator valid after move_back while std::list only support
 |:---------------:|:---------:|:---------:|:---------:|
 | push + pop 100m | 2.65554s  | 1.57707s  | 1.86868s  |
 
+#### Hashmap
+|         Test         |  HashSet  | std::unordered_set |
+|:--------------------:|:---------:|:------------------:|
+| insert + contain 10m |   0.53s   |       1.19s        |
+
 #### Vector
 |           Test            | Vector    | std::vector |
 |:-------------------------:|:---------:|:-----------:|

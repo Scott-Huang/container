@@ -79,4 +79,6 @@ void optional_destroy(T &, std::false_type const &) {}
 template <typename T>
 void optional_destroy(T &obj) { container_helper::optional_destroy(obj, container_helper::has_destroyer<T>{}); }
 
+struct EmptyObject {};
+
 #endif /* CONTAINER_DEFINITION_H */
