@@ -1,0 +1,190 @@
+/**
+ * Copyright ...
+ * we don't do basic_string_view now as char * is the only thingy we care
+ * it differs from std::string_view with a transfer func to cstr
+ */
+
+#ifndef CONTAINER_STRINGVIEW_H
+#define CONTAINER_STRINGVIEW_H
+
+#include <vtl/internal/container.hpp>
+#if CONTAINER_USE_STL_STRINGVIEW
+#include <string_view>
+using StringView = std::string_view;
+#else
+#if __cplusplus >= 202002L
+#include <compare>
+#endif
+#include <type_traits>  /* conditional */
+#include <iterator>     /* reverse iterator */
+#include <functional>   /* hash */
+#if __cplusplus >= 201703L
+#include <string>       /* char_traits */
+#endif
+
+#include <vtl/internal/expr.hpp>
+#include <vtl/allocator>
+
+class CStringView {
+public:
+    using value_type = char;
+    using pointer = char *;
+    using const_pointer = const char *;
+    using reference = char &;
+    using const_reference = const char &;
+    using size_type = typename std::conditional<(sizeof(pointer) > sizeof(uint32)),
+                                                size_t, uint32>::type;
+
+    CStringView() = default;
+    CStringView(char *s) : _str(s) {}
+    CStringView(const CStringView &) = default;
+    CStringView(CStringView &&) = default;
+    CStringView &operator=(const CStringView &) = default;
+    CStringView &operator=(CStringView &&) = default;
+    void swap(CStringView &other) { std::swap(_str, other._str); }
+
+    _GLIBCXX17_CONSTEXPR const_reference at(size_type pos) const { return _str[pos]; }
+    _GLIBCXX17_CONSTEXPR reference at(size_type pos) { return _str[pos]; }
+    _GLIBCXX17_CONSTEXPR const_reference operator[](size_type pos) const { return at(pos); }
+    _GLIBCXX17_CONSTEXPR reference operator[](size_type pos) { return at(pos); }
+
+    _GLIBCXX17_CONSTEXPR const_pointer data() const { return _str; }
+    _GLIBCXX17_CONSTEXPR pointer data() { return _str; }
+    _GLIBCXX17_CONSTEXPR bool empty() const { return _str[0] == '\0'; }
+
+#if __cplusplus >= 202002L
+    std::strong_ordering operator<=>(const CStringView &other) const
+    {
+        int res = strcmp(_str, other._str);
+        if (res < 0) {
+            return std::strong_ordering::less;
+        }
+        if (res > 0) {
+            return std::strong_ordering::greater;
+        }
+        return std::strong_ordering::equal;
+    }
+#else
+    bool operator<(const CStringView &other) const { return strcmp(_str, other._str) < 0; }
+    bool operator<=(const CStringView &other) const { return strcmp(_str, other._str) <= 0; }
+    bool operator>(const CStringView &other) const { return strcmp(_str, other._str) > 0; }
+    bool operator>=(const CStringView &other) const { return strcmp(_str, other._str) >= 0; }
+    bool operator!=(const CStringView &other) const { return strcmp(_str, other._str) != 0; }
+#endif
+    bool operator==(const CStringView &other) const { return strcmp(_str, other._str) == 0; }
+private:
+    char *_str;
+};
+
+class StringView : public CStringView {
+public:
+    using iterator = char *;
+    using const_iterator = const char *;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+    StringView() = default;
+#if __cplusplus >= 201703L
+    StringView(char *s) : CStringView(s), _len(std::char_traits<char>::length(s)) {}
+#else
+    StringView(char *s) : CStringView(s), _len(strlen(s)) {}
+#endif
+    StringView(char *s, size_type len) : CStringView(s), _len(len) {}
+    StringView(const StringView &) = default;
+    StringView(StringView &&) = default;
+    StringView &operator=(const StringView &) = default;
+    StringView &operator=(StringView &&) = default;
+    void swap(StringView &other)
+    {
+        CStringView::swap(other);
+        std::swap(_len, other._len);
+    }
+
+
+    _GLIBCXX17_CONSTEXPR const_iterator cbegin() const { return data(); }
+    _GLIBCXX17_CONSTEXPR const_iterator cend() const { return data() + _len; }
+    _GLIBCXX17_CONSTEXPR const_iterator begin() const { return cbegin(); }
+    _GLIBCXX17_CONSTEXPR const_iterator end() const { return cend(); }
+    _GLIBCXX17_CONSTEXPR iterator begin() { return data(); }
+    _GLIBCXX17_CONSTEXPR iterator end() { return data() + _len; }
+    _GLIBCXX17_CONSTEXPR const_reverse_iterator crbegin() const
+        { return const_reverse_iterator(cend()); }
+    _GLIBCXX17_CONSTEXPR const_reverse_iterator crend() const
+        { return const_reverse_iterator(cbegin()); }
+    _GLIBCXX17_CONSTEXPR const_reverse_iterator rbegin() const { return crbegin(); }
+    _GLIBCXX17_CONSTEXPR const_reverse_iterator rend() const { return crend(); }
+    _GLIBCXX17_CONSTEXPR reverse_iterator rbegin() { return reverse_iterator(end()); }
+    _GLIBCXX17_CONSTEXPR reverse_iterator rend() { return reverse_iterator(begin()); }
+
+    _GLIBCXX17_CONSTEXPR const_reference front() const { return data()[0]; }
+    _GLIBCXX17_CONSTEXPR reference front() { return data()[0]; }
+    _GLIBCXX17_CONSTEXPR const_reference back() const { return data()[_len - 1]; }
+    _GLIBCXX17_CONSTEXPR reference back() { return data()[_len - 1]; }
+
+    _GLIBCXX17_CONSTEXPR size_type size() const { return _len; }
+    _GLIBCXX17_CONSTEXPR size_t ssize() const { return _len; }
+    _GLIBCXX17_CONSTEXPR size_type length() const { return _len; }
+    _GLIBCXX17_CONSTEXPR bool empty() const { return _len == 0; }
+
+#if __cplusplus >= 202002L
+    std::strong_ordering operator<=>(const StringView &other) const
+    {
+        int res = strncmp(_str, other._str, _len);
+        if (res < 0) {
+            return std::strong_ordering::less;
+        }
+        if (res > 0) {
+            return std::strong_ordering::greater;
+        }
+        return std::strong_ordering::equal;
+    }
+#else
+    bool operator<(const StringView &other) const { return strncmp(data(), other.data(), _len) < 0; }
+    bool operator<=(const StringView &other) const { return strncmp(data(), other.data(), _len) <= 0; }
+    bool operator>(const StringView &other) const { return strncmp(data(), other.data(), _len) > 0; }
+    bool operator>=(const StringView &other) const { return strncmp(data(), other.data(), _len) >= 0; }
+    bool operator!=(const StringView &other) const { return strncmp(data(), other.data(), _len) != 0; }
+#endif
+    bool operator==(const StringView &other) const { return strncmp(data(), other.data(), _len) == 0; }
+
+    template <template <typename> class Allocator = DEFAULT_ALLOCATOR, typename... Args>
+    char *cstr(Args &&...args) const
+    {
+        Allocator<char> alloc(std::forward<Args>(args)...);
+        char *res = alloc.allocate(_len + 1);
+        ann_helper::optional_destroy(alloc);
+        memcpy(res, data(), _len);
+        res[_len] = '\0';
+        return res;
+    }
+private:
+    size_type _len;
+};
+
+template <>
+struct std::hash<CStringView> {
+    size_t operator()(const CStringView &csv) const noexcept
+    {
+        size_t hash = 5381ul;
+        const char *ptr = csv.data();
+        while (*ptr) {
+            hash = ((hash << 5) + hash) + *ptr++;
+        }
+        return hash;
+    }
+};
+template <>
+struct std::hash<StringView> {
+    size_t operator()(const StringView &sv) const noexcept
+    {
+        size_t hash = 5381ul;
+        const char *ptr = sv.data();
+        for (StringView::size_type i = 0; i < sv.length(); ++i, ++ptr) {
+            hash = ((hash << 5) + hash) + *ptr;
+        }
+        return hash;
+    }
+};
+
+#endif
+#endif /* CONTAINER_STRINGVIEW_H */
